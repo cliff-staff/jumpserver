@@ -71,7 +71,37 @@ Caddy 是唯一對外入口(80/443),`web` 容器改成內部服務不再對外�
 憑證存在 `caddy_data` volume,**務必納入備份(CLJUMPSERV-13)**,避免重建時觸發 Let's Encrypt 速率限制。
 設定檔:[`Caddyfile`](./Caddyfile)。
 
+## 備份 / 還原(CLJUMPSERV-13)
+
+```bash
+./deploy/backup.sh [BACKUP_DIR] [RETENTION_DAYS]   # 預設 ./backups、保留 14 天
+```
+
+備份內容(打包成一個 `jumpserver-backup-<時間>.tar.gz`):
+
+| 項目 | 來源 |
+|---|---|
+| `db.sql.gz` | PostgreSQL `pg_dump` |
+| `env.bak` | `deploy/.env`(**含 secret**) |
+| `core_data.tgz` | 媒體 / 連線錄影 / static |
+| `caddy_data.tgz` | Let's Encrypt 憑證(重建避免撞速率限制) |
+
+> Redis 只是快取 / session(可重建),**不備份**。`core_data`/`caddy_data` 用 `--volumes-from`
+> 直接抓容器 volume,不必知道 volume 名。備份檔含 secret,`chmod 600` 並存到異地。
+
+排程(每天 3:00,保留 14 天):
+
+```cron
+0 3 * * *  cd /path/to/jumpserver && ./deploy/backup.sh /var/backups/jumpserver 14 >> /var/log/jms-backup.log 2>&1
+```
+
+還原(**具破壞性**,會覆蓋現有 DB / 錄影 / 憑證):
+
+```bash
+./deploy/restore.sh backups/jumpserver-backup-YYYYmmdd-HHMMSS.tar.gz --yes
+```
+
 ## 後續(其他 Plane task)
 
 - **CLJUMPSERV-12**:冒煙測試(登入 / SSH / RDP / DB 經 magnus / 稽核錄影)。
-- **CLJUMPSERV-13**:備份 `pg_data`、`.env`、`core_data`(錄影/上傳)、`caddy_data`(憑證)。
+- **CLJUMPSERV-14**:監控 / 日誌輪替 / healthcheck 告警。
