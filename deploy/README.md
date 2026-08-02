@@ -19,6 +19,17 @@
 
 > 設定走環境變數:core 讀 `os.environ`(`apps/jumpserver/conf.py`),故不掛 `config.yml`,全部由 `.env` 帶入。
 
+### chen vs magnus(存取 DB 資產的兩種方式)
+
+兩者都提供**受稽核**的資料庫存取,差別只在使用者「在瀏覽器裡查」還是「用自己的工具連」:
+
+| | 在哪操作 | 要裝工具嗎 | 對外埠 |
+|---|---|---|---|
+| **chen** | JumpServer 網頁裡的 Web DB 介面(類似網頁版 DBeaver) | 不用,瀏覽器就好 | 無(走 443) |
+| **magnus** | 使用者自己的 DBeaver / Navicat / `mysql` CLI,透過 JumpServer 代理連 | 要 | 33061… 那 7 個 |
+
+常見做法是兩個都開,讓使用者自選。若確定不用原生 DB 工具直連,magnus 的 7 個埠可不對外開。
+
 ## ✅ 版本對齊(CLJUMPSERV-4,已定案)
 
 **目標:穩定 `v4.10.18-ce`。** 調查結論(2026-08-02):
@@ -98,6 +109,32 @@ Caddy 是唯一對外入口(80/443),`web` 容器改成內部服務不再對外�
 ```bash
 ./deploy/restore.sh backups/jumpserver-backup-YYYYmmdd-HHMMSS.tar.gz --yes
 ```
+
+## 監控 / 日誌(CLJUMPSERV-14)
+
+**日誌輪替**(避免容器 log 塞爆磁碟)——設定 Docker 全域 log rotation,套用所有容器:
+
+```bash
+sudo cp deploy/monitoring/daemon.json /etc/docker/daemon.json   # json-file max-size 20m x 5
+sudo systemctl restart docker && docker compose -f deploy/docker-compose.yml up -d
+```
+
+**健康 / 磁碟監控**——`monitor.sh` 檢查:任一容器非 running / unhealthy、Docker 資料碟使用率超標
+(預設 85%,錄影會長)。有問題時 exit 非 0,並可選擇性打 webhook 告警:
+
+```bash
+./deploy/monitor.sh                                  # 印狀態;有問題 exit 1
+DISK_THRESHOLD=90 ALERT_WEBHOOK=https://... ./deploy/monitor.sh   # 超標打 Slack/Discord webhook
+```
+
+排程(每 5 分鐘檢查一次):
+
+```cron
+*/5 * * * *  cd /path/to/jumpserver && ALERT_WEBHOOK=https://hooks... ./deploy/monitor.sh >> /var/log/jms-monitor.log 2>&1
+```
+
+> compose 每個服務都已設 healthcheck(用官方 `check` 工具),`docker compose ps` 可直接看健康狀態;
+> `monitor.sh` 只是把它彙整 + 加磁碟檢查 + 告警。
 
 ## 後續(其他 Plane task)
 
