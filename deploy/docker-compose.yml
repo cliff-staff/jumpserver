@@ -4,8 +4,10 @@
 # Config is env-driven: JumpServer core reads env vars (apps/jumpserver/conf.py -> os.environ.get),
 # so no config.yml is mounted; everything comes from .env.
 #
-# Component images (koko/lion/magnus/chen/web) MUST match the core version — see deploy/README.md
-# and Plane CLJUMPSERV-4. Set the tags via COMPONENT_TAG / CORE_IMAGE in .env.
+# Target: stable v4.10.18-ce (CLJUMPSERV-4 decision). core/koko/lion/chen/web all pin
+# COMPONENT_TAG=v4.10.18-ce; magnus has no v4 tag so it pins MAGNUS_TAG=v3.10.22 (7-port
+# model, matches the pre-single-port v4.10.18 core). CORE_IMAGE defaults to the official
+# core image. See deploy/README.md.
 #
 # Usage:
 #   cp deploy/.env.example deploy/.env   &&   edit deploy/.env
@@ -128,7 +130,10 @@ services:
     networks: [jms_net]
 
   magnus:
-    image: jumpserver/magnus:${COMPONENT_TAG}
+    # magnus has NO v4.10.x tag — it ships on its own v3.10.x line.
+    # Pinned to v3.10.22 (per-protocol 7-port model), which pairs with the
+    # v4.10.18-ce core (pre single-port change a9689d81e). See deploy/README.md.
+    image: jumpserver/magnus:${MAGNUS_TAG}
     container_name: jms_magnus
     restart: unless-stopped
     environment:
@@ -140,8 +145,13 @@ services:
       core: {condition: service_healthy}
     networks: [jms_net]
     ports:
-      # Upstream a9689d81e consolidated all DB protocols onto ONE magnus port (default 5525).
-      - "${MAGNUS_PORT:-5525}:5525"
+      - "${MAGNUS_MYSQL_PORT:-33061}:33061"
+      - "${MAGNUS_MARIADB_PORT:-33062}:33062"
+      - "${MAGNUS_REDIS_PORT:-63790}:63790"
+      - "${MAGNUS_POSTGRESQL_PORT:-54320}:54320"
+      - "${MAGNUS_SQLSERVER_PORT:-14330}:14330"
+      - "${MAGNUS_ORACLE_PORT:-15210}:15210"
+      - "${MAGNUS_MONGODB_PORT:-27018}:27018"
 
   chen:
     image: jumpserver/chen:${COMPONENT_TAG}
