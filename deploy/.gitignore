@@ -2,3 +2,6 @@
 .env
 .env.*
 !.env.example
+
+# backups contain a DB dump + env secrets — never commit
+backups/
