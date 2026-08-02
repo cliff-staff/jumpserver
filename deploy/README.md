@@ -38,20 +38,21 @@ v3.10.x magnus 為**每種 DB 一個埠**:mysql 33061 / mariadb 33062 / redis 63
 
 ## 部署步驟
 
-```bash
-./deploy/gen-env.sh          # 產 deploy/.env,自動填入隨機 secret(CLJUMPSERV-7)
-# 檢視 deploy/.env 的非機密欄位(image tag / TZ / ports),需要才調整
-# 真 secret 已填好且 .env 為 chmod 600、已被 gitignore,勿 commit
+在目標機、repo 根目錄執行:
 
-docker compose -f deploy/docker-compose.yml up -d          # 啟動(CLJUMPSERV-10)
-docker compose -f deploy/docker-compose.yml ps             # 確認各容器 healthy
-docker compose -f deploy/docker-compose.yml logs -f core   # core 首次啟動會自動 DB migrate
+```bash
+./deploy/gen-env.sh    # 產 deploy/.env,自動填入隨機 secret(CLJUMPSERV-7)
+# 檢視 deploy/.env 的非機密欄位(image tag / TZ / ports),需要才調整
+./deploy/up.sh         # pull + up -d + 等 core healthy(CLJUMPSERV-10)
 ```
 
-建立管理員(若 image 未自動建):
+`up.sh` 做的事:pull image → `up -d` → 等 `jms_core` 變 healthy(首次啟動 core 會自動跑
+DB migrate,並由 data migration 建預設管理員)。完成後印出登入資訊。
+
+**預設管理員:`admin` / `ChangeMe`——登入後立刻改密碼。** 需要重設:
 
 ```bash
-docker compose -f deploy/docker-compose.yml exec core bash -lc "cd apps && python manage.py createsuperuser"
+docker compose -f deploy/docker-compose.yml exec core bash -lc "cd apps && python manage.py changepassword admin"
 ```
 
 ## 後續(其他 Plane task)

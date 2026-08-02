@@ -77,11 +77,12 @@ services:
       redis: {condition: service_healthy}
     networks: [jms_net]
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/api/health/ || exit 1"]
+      # official JumpServer images ship a `check` binary (no curl in the image)
+      test: ["CMD-SHELL", "check http://localhost:8080/api/health/"]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 120s   # first boot runs DB migrate
+      start_period: 180s   # first boot runs DB migrate + downloads GeoIP/applets
 
   celery:
     image: ${CORE_IMAGE}
@@ -94,6 +95,12 @@ services:
     depends_on:
       core: {condition: service_healthy}
     networks: [jms_net]
+    healthcheck:
+      test: ["CMD-SHELL", "bash /opt/jumpserver/utils/check_celery.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
 
   # ---------- terminal / proxy components ----------
   # NOTE: pin COMPONENT_TAG in .env to a version that matches core (CLJUMPSERV-4).
@@ -113,6 +120,12 @@ services:
     networks: [jms_net]
     ports:
       - "${SSH_PORT:-2222}:2222"   # SSH entry for asset connections
+    healthcheck:
+      test: ["CMD-SHELL", "check http://localhost:5000/koko/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   lion:
     image: jumpserver/lion:${COMPONENT_TAG}
@@ -128,6 +141,12 @@ services:
     depends_on:
       core: {condition: service_healthy}
     networks: [jms_net]
+    healthcheck:
+      test: ["CMD-SHELL", "check http://localhost:8081/lion/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   magnus:
     # magnus has NO v4.10.x tag — it ships on its own v3.10.x line.
@@ -165,6 +184,12 @@ services:
     depends_on:
       core: {condition: service_healthy}
     networks: [jms_net]
+    healthcheck:
+      test: ["CMD-SHELL", "check http://localhost:8082/chen/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   # ---------- web entry (nginx: serves lina+luna, reverse-proxies core/koko/lion/chen) ----------
   web:
@@ -184,3 +209,9 @@ services:
     networks: [jms_net]
     ports:
       - "${HTTP_PORT:-80}:80"   # put a TLS reverse proxy in front (CLJUMPSERV-11)
+    healthcheck:
+      test: ["CMD-SHELL", "check http://localhost/web/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
