@@ -41,8 +41,6 @@ v3.10.x magnus 為**每種 DB 一個埠**:mysql 33061 / mariadb 33062 / redis 63
 
 在目標機、repo 根目錄執行:
 
-在目標機、repo 根目錄執行:
-
 ```bash
 ./deploy/gen-env.sh    # 產 deploy/.env,自動填入隨機 secret(CLJUMPSERV-7)
 # 編輯 deploy/.env:填入真實 DOMAIN 與 TLS_EMAIL(否則 up.sh 會擋)
