@@ -12,22 +12,29 @@
 | celery | `${CORE_IMAGE}` | 背景任務(`jms start task`) | 內部 |
 | koko | `jumpserver/koko` | SSH/Telnet/K8s 終端代理 | `2222` |
 | lion | `jumpserver/lion` | RDP/VNC 圖形代理 | 內部 |
-| magnus | `jumpserver/magnus` | **資料庫代理(單埠)** | `5525` |
+| magnus | `jumpserver/magnus` | 資料庫代理(**7 埠模型**) | `33061/33062/63790/54320/14330/15210/27018` |
 | chen | `jumpserver/chen` | Web 資料庫用戶端 | 內部 |
 | web | `jumpserver/web` | nginx:serve lina+luna,反代 core/koko/lion/chen | `80` |
 
 > 設定走環境變數:core 讀 `os.environ`(`apps/jumpserver/conf.py`),故不掛 `config.yml`,全部由 `.env` 帶入。
 
-## ⚠️ 版本對齊(CLJUMPSERV-4,務必先做)
+## ✅ 版本對齊(CLJUMPSERV-4,已定案)
 
-本 repo core 是上游 `dev`(`VERSION=2.0.0`,Python 3.14 / Django 4.1,前沿)。周邊元件 image tag 必須與 core **相容**,否則註冊失敗或協定不通。
+**目標:穩定 `v4.10.18-ce`。** 調查結論(2026-08-02):
 
-- `CORE_IMAGE`:用本 repo build 的 core image,或對應版本的官方 core image。
-- `COMPONENT_TAG`:koko/lion/magnus/chen/web 的 tag,須對齊 core。`.env.example` 先填 `v2.0.0` 佔位——**上線前確認實際可用的相容 tag**。
+| 元件 | 用的 tag | 說明 |
+|---|---|---|
+| core | `jumpserver/core:v4.10.18-ce` | **官方 image**,不用 fork 的 dev HEAD |
+| koko / lion / chen / web | `v4.10.18-ce` | 與 core 對齊(`COMPONENT_TAG`) |
+| magnus | `v3.10.22` | magnus **無 v4 tag**,自成 v3.10.x 版本線(`MAGNUS_TAG`) |
 
-## Magnus 單埠(CLJUMPSERV-9)
+**為什麼不用 fork 的 dev HEAD?** 本 repo dev(≈ v4.10.19-rc2 線)含上游 commit `a9689d81e`,把 Magnus 改成**單埠 5525**;但**所有已發布的 magnus 都還是舊 7 埠**,單埠 magnus 元件 image 尚未發布。用 dev core 會導致 DB 代理連不通。改用 `v4.10.18-ce`(單埠變更「之前」的穩定版),core 仍是 7 埠模型,正好對上 magnus v3.10.22。
 
-上游 commit `a9689d81e` 把 Magnus 從「每種 DB 一個埠」改成**單一 `magnus_port`(預設 5525)**,所有 DB 協定(mysql/mariadb/postgresql/redis/sqlserver/oracle/mongodb)共用。所以只對外開一個 `5525`。migration `0011_endpoint_magnus_port` 會移除舊的 7 個埠欄位(不可逆,migrate 前備份 DB)。
+> 若日後要用單埠 5525:須等上游發布對應的 magnus image(或自 build),屆時把 core 升到含 a9689d81e 的版本、magnus 換成單埠版、compose 埠改回單一 5525。
+
+## Magnus 7 埠(CLJUMPSERV-9)
+
+v3.10.x magnus 為**每種 DB 一個埠**:mysql 33061 / mariadb 33062 / redis 63790 / postgresql 54320 / sqlserver 14330 / oracle 15210 / mongodb 27018。compose 已全部對外對映;各埠可在 `.env` 用 `MAGNUS_*_PORT` 調整。
 
 ## 部署步驟
 
