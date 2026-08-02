@@ -13,6 +13,10 @@ command -v docker >/dev/null || { echo "ERROR: docker not installed (CLJUMPSERV-
 docker compose version >/dev/null 2>&1 || { echo "ERROR: 'docker compose' plugin not available"; exit 1; }
 [ -f .env ] || { echo "ERROR: .env missing — run ./gen-env.sh first (CLJUMPSERV-7)"; exit 1; }
 grep -q 'CHANGE_ME' .env && { echo "ERROR: .env still has CHANGE_ME placeholders — run ./gen-env.sh"; exit 1; }
+grep -q 'example.com' .env && { echo "ERROR: set a real DOMAIN / TLS_EMAIL in .env (still example.com)"; exit 1; }
+
+# shellcheck disable=SC1091
+set -a; . ./.env; set +a
 
 echo ">> Pulling images..."
 $COMPOSE pull
@@ -42,8 +46,9 @@ $COMPOSE ps
 echo ""
 echo "=================================================================="
 echo " JumpServer is up."
-echo "   URL   : http://<this-host>:${HTTP_PORT:-80}/   (put TLS in front — CLJUMPSERV-11)"
+echo "   URL   : https://${DOMAIN}/   (Caddy auto-provisions the TLS cert on first hit)"
 echo "   Login : admin / ChangeMe   <-- CHANGE THIS PASSWORD IMMEDIATELY"
+echo "   TLS   : ensure DNS for ${DOMAIN} points here and ports 80+443 are open."
 echo ""
 echo " Verify terminal components registered (koko/lion/magnus/chen should"
 echo " appear online under 系統設定 > 終端機, or via CLJUMPSERV-12 smoke test)."
