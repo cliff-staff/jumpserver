@@ -2,6 +2,8 @@
 
 單機 `docker compose` 編排,PostgreSQL 與 Redis 自建於容器內。對應 Plane **CLJUMPSERV-8**。
 
+> 維運操作手冊(安裝 / 上線 / 備份 / 故障排除)見 **[RUNBOOK.md](./RUNBOOK.md)**。
+
 ## 元件
 
 | 服務 | Image | 角色 | 對外埠 |
