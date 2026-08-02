@@ -26,6 +26,8 @@ volumes:
   core_data:      # shared by core + celery: media, recordings, static, ansible
   koko_data:
   lion_data:
+  caddy_data:     # Let's Encrypt certs — back this up (CLJUMPSERV-13)
+  caddy_config:
 
 services:
   # ---------- data stores ----------
@@ -191,7 +193,8 @@ services:
       retries: 5
       start_period: 30s
 
-  # ---------- web entry (nginx: serves lina+luna, reverse-proxies core/koko/lion/chen) ----------
+  # ---------- web (nginx: serves lina+luna, reverse-proxies core/koko/lion/chen) ----------
+  # Internal only — Caddy terminates TLS and fronts it. Not published to host.
   web:
     image: jumpserver/web:${COMPONENT_TAG}
     container_name: jms_web
@@ -207,11 +210,30 @@ services:
       lion: {condition: service_started}
       chen: {condition: service_started}
     networks: [jms_net]
-    ports:
-      - "${HTTP_PORT:-80}:80"   # put a TLS reverse proxy in front (CLJUMPSERV-11)
     healthcheck:
       test: ["CMD-SHELL", "check http://localhost/web/health/"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 30s
+
+  # ---------- TLS reverse proxy (single entry, auto Let's Encrypt) ----------
+  caddy:
+    image: caddy:2-alpine
+    container_name: jms_caddy
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN}
+      TLS_EMAIL: ${TLS_EMAIL}
+      TZ: ${TZ:-Asia/Taipei}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data       # persists ACME certs & account — DO NOT delete
+      - caddy_config:/config
+    depends_on:
+      web: {condition: service_healthy}
+    networks: [jms_net]
+    ports:
+      - "80:80"        # ACME HTTP-01 challenge + http->https redirect
+      - "443:443"      # HTTPS
+      - "443:443/udp"  # HTTP/3 (QUIC)

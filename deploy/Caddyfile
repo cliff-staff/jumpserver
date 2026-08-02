@@ -1,0 +1,16 @@
+# TLS reverse proxy for JumpServer (CLJUMPSERV-11).
+# DOMAIN / TLS_EMAIL come from deploy/.env (passed as env to the caddy container).
+# Caddy auto-provisions & renews a Let's Encrypt cert for DOMAIN, redirects
+# http->https, and transparently forwards WebSocket upgrades (web terminal needs it).
+
+{$DOMAIN} {
+	encode zstd gzip
+	tls {$TLS_EMAIL}
+
+	# JumpServer's own nginx (the `web` container) does all internal routing
+	# (/koko/ /lion/ /ws/ media static). Just forward everything to it.
+	reverse_proxy web:80 {
+		# stream responses (session recording playback / SSE) without buffering
+		flush_interval -1
+	}
+}

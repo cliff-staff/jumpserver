@@ -14,7 +14,8 @@
 | lion | `jumpserver/lion` | RDP/VNC 圖形代理 | 內部 |
 | magnus | `jumpserver/magnus` | 資料庫代理(**7 埠模型**) | `33061/33062/63790/54320/14330/15210/27018` |
 | chen | `jumpserver/chen` | Web 資料庫用戶端 | 內部 |
-| web | `jumpserver/web` | nginx:serve lina+luna,反代 core/koko/lion/chen | `80` |
+| web | `jumpserver/web` | nginx:serve lina+luna,反代 core/koko/lion/chen | 內部(由 Caddy 反代) |
+| caddy | `caddy:2-alpine` | **TLS 反向代理 / 唯一 HTTP(S) 入口**,自動 Let's Encrypt | `80` / `443` |
 
 > 設定走環境變數:core 讀 `os.environ`(`apps/jumpserver/conf.py`),故不掛 `config.yml`,全部由 `.env` 帶入。
 
@@ -40,10 +41,12 @@ v3.10.x magnus 為**每種 DB 一個埠**:mysql 33061 / mariadb 33062 / redis 63
 
 在目標機、repo 根目錄執行:
 
+在目標機、repo 根目錄執行:
+
 ```bash
 ./deploy/gen-env.sh    # 產 deploy/.env,自動填入隨機 secret(CLJUMPSERV-7)
-# 檢視 deploy/.env 的非機密欄位(image tag / TZ / ports),需要才調整
-./deploy/up.sh         # pull + up -d + 等 core healthy(CLJUMPSERV-10)
+# 編輯 deploy/.env:填入真實 DOMAIN 與 TLS_EMAIL(否則 up.sh 會擋)
+./deploy/up.sh         # pull + up -d + 等 core healthy(CLJUMPSERV-10/11)
 ```
 
 `up.sh` 做的事:pull image → `up -d` → 等 `jms_core` 變 healthy(首次啟動 core 會自動跑
@@ -55,8 +58,20 @@ DB migrate,並由 data migration 建預設管理員)。完成後印出登入資�
 docker compose -f deploy/docker-compose.yml exec core bash -lc "cd apps && python manage.py changepassword admin"
 ```
 
+## TLS / 反向代理(CLJUMPSERV-11,Caddy)
+
+Caddy 是唯一對外入口(80/443),`web` 容器改成內部服務不再對外發布。Caddy 自動向 Let's Encrypt
+申請並續約 `DOMAIN` 的憑證,http 自動轉 https,並透通轉發 WebSocket(web terminal 需要)。
+
+**前置(上線前必備):**
+1. DNS:`DOMAIN` 的 A/AAAA 記錄要先指到這台機器。
+2. 防火牆:對外開 **80 + 443**(80 供 ACME HTTP-01 challenge 與轉址)。
+3. `.env` 的 `DOMAIN` / `TLS_EMAIL` 填真值(勿留 `example.com`)。
+
+憑證存在 `caddy_data` volume,**務必納入備份(CLJUMPSERV-13)**,避免重建時觸發 Let's Encrypt 速率限制。
+設定檔:[`Caddyfile`](./Caddyfile)。
+
 ## 後續(其他 Plane task)
 
-- **CLJUMPSERV-11**:前面架 nginx/caddy 反代到 `web:80` + Let's Encrypt TLS,強制 https、轉發 websocket。
 - **CLJUMPSERV-12**:冒煙測試(登入 / SSH / RDP / DB 經 magnus / 稽核錄影)。
-- **CLJUMPSERV-13**:備份 `pg_data`、`.env`、`core_data`(錄影/上傳)。
+- **CLJUMPSERV-13**:備份 `pg_data`、`.env`、`core_data`(錄影/上傳)、`caddy_data`(憑證)。
