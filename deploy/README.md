@@ -39,8 +39,9 @@ v3.10.x magnus 為**每種 DB 一個埠**:mysql 33061 / mariadb 33062 / redis 63
 ## 部署步驟
 
 ```bash
-cp deploy/.env.example deploy/.env
-# 產 secret 並填入 deploy/.env(指令見 .env.example 註解)
+./deploy/gen-env.sh          # 產 deploy/.env,自動填入隨機 secret(CLJUMPSERV-7)
+# 檢視 deploy/.env 的非機密欄位(image tag / TZ / ports),需要才調整
+# 真 secret 已填好且 .env 為 chmod 600、已被 gitignore,勿 commit
 
 docker compose -f deploy/docker-compose.yml up -d          # 啟動(CLJUMPSERV-10)
 docker compose -f deploy/docker-compose.yml ps             # 確認各容器 healthy
