@@ -227,7 +227,7 @@ services:
       TLS_EMAIL: ${TLS_EMAIL}
       TZ: ${TZ:-Asia/Taipei}
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro,Z   # :Z for SELinux-enforcing hosts (Rocky/RHEL)
       - caddy_data:/data       # persists ACME certs & account — DO NOT delete
       - caddy_config:/config
     depends_on:
